@@ -3,39 +3,37 @@ from player import Player
 from platform_model import Platform
 
 pygame.init()
-WIDTH, HEIGHT = 1200, 600  # wider window for easier layout
+WIDTH, HEIGHT = 1400, 600  # Wider window for spacious level
 FPS = 60
 GRAVITY = 0.4
 
 win = pygame.display.set_mode((WIDTH, HEIGHT))
-pygame.display.set_caption("Jump King - Easy Level")
+pygame.display.set_caption("Jump King - Final Easy Level")
 clock = pygame.time.Clock()
 
 def get_fixed_level():
     platforms = []
-    # Start and end platforms on extremes
-    platforms.append(Platform(0, HEIGHT - 40, 100, 20, "start"))
-    platforms.append(Platform(WIDTH - 100, 120, 100, 20, "end"))
+    ground_y = HEIGHT - 40
+    # Start platform (left ground)
+    platforms.append(Platform(0, ground_y, 100, 20, "start"))
 
-    # Easy, spaced pads moving left to right, gradual vertical changes
+    # Intermediate pads, smooth ascending jumps
     pads = [
-        (180, HEIGHT - 140),  # after start
+        (180, HEIGHT - 140),
         (350, HEIGHT - 200),
         (520, HEIGHT - 260),
         (700, HEIGHT - 230),
         (880, HEIGHT - 280),
         (1050, HEIGHT - 200),
     ]
-
     for x, y in pads:
         platforms.append(Platform(x, y, 100, 20, "pad"))
 
+    # End platform at ground level, right of last pad
+    end_x = pads[-1][0] + 240
+    platforms.append(Platform(end_x, ground_y, 100, 20, "end"))
+
     return platforms
-
-# rest of main() as before...
-# (Use the player.py and platform.py unchanged, just adjust main.py's window and level setup)
-
-# Your main game loop will be same, just call get_fixed_level() here
 
 def main():
     run = True

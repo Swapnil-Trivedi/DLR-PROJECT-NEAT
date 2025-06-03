@@ -9,7 +9,7 @@ class Platform:
 
     def draw(self, win):
         color = {
-            "start": (0, 100, 255),
+            "start": (100, 100, 255),
             "end": (255, 100, 0),
             "pad": (0, 200, 0)
         }.get(self.type, (0, 200, 0))
