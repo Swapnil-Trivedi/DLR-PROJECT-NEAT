@@ -81,7 +81,8 @@ def main():
             plat.draw(win)
 
         player.draw(win)
-        player.draw_charge_bar(win)
+        player.draw_trajectory(win)
+
 
         font = pygame.font.SysFont(None, 24)
         win.blit(font.render(f"Score: {score}", True, (0, 0, 0)), (10, 10))
