@@ -4,7 +4,7 @@ from platform_model import Platform
 
 pygame.init()
 WIDTH, HEIGHT = 1400, 600  # Wider window for spacious level
-FPS = 60
+FPS = 90
 GRAVITY = 0.4
 
 win = pygame.display.set_mode((WIDTH, HEIGHT))

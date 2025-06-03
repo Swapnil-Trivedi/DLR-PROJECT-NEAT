@@ -29,6 +29,7 @@ class Player:
 
     def apply_gravity(self, g):
         self.vel_y += g
+        self.vel_y = min(self.vel_y, 15)  # cap fall speed
 
     def update(self):
         self.x += self.vel_x
