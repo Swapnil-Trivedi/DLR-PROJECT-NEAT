@@ -8,7 +8,7 @@ FPS = 90
 GRAVITY = 0.4
 
 win = pygame.display.set_mode((WIDTH, HEIGHT))
-pygame.display.set_caption("Jump King - Final Easy Level")
+pygame.display.set_caption("Jump King")
 clock = pygame.time.Clock()
 
 def get_fixed_level():
