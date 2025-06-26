@@ -26,10 +26,10 @@ def eval_genomes(genomes, config, render_genome=None):
             env.render()
 
             norm_obs = np.array([
-                obs[0] / WIDTH,
-                obs[1] / HEIGHT,
-                (obs[2] + 15) / 30,
-                (obs[3] + 15) / 30,
+                obs[0] / WIDTH,        # player x
+                obs[1] / HEIGHT,       # player y
+                obs[2] / WIDTH,        # next pad center x
+                obs[3] / HEIGHT        # next pad center y
             ])
 
             action_prob = net.activate(norm_obs)

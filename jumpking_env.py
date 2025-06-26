@@ -15,6 +15,7 @@ class Game:
         self.display = None
         self.WIDTH = WIDTH    
         self.HEIGHT = HEIGHT
+        self.jumping = False
         self.highest_score = 0  # tracks best score across all runs
         self.reset()  # initializes current player and score
         if self.render_mode == "human":
@@ -58,75 +59,84 @@ class Game:
         return self._get_obs()
 
     def step(self, action):
-        # Track jump start
-        if self.player.on_ground and not getattr(self.player, 'jumping', False):
-            self.player.jumping = False  # reset jump state
-        if self.player.on_ground and action in [1, 2]:
-            # Player is about to jump
-            self.player.jumping = True
-            self.player.jump_start_x = self.player.x
-            self.player.jump_start_y = self.player.y
-            self.player.max_jump_y = self.player.y  # reset max height tracker
-    
+        prev_x = self.player.x
+
+        if self.player.on_ground:
+            if action == 1 or action == 2:  # jump left or right
+                dx, dy = self.player.get_aim_direction()
+                if action == 1:
+                    self.player.jump(abs(dx), dy)  # jump right
+                elif action == 2:
+                    self.player.jump(-abs(dx), dy)  # jump left
+                self.jump_start_x = self.player.x  # mark jump start position
+                self.jumping = True
+
         self.player.apply_gravity(GRAVITY)
         self.player.update()
-    
-        # If jumping, track max jump height
-        if getattr(self.player, 'jumping', False):
-            if self.player.y > self.player.max_jump_y:
-                self.player.max_jump_y = self.player.y
-    
-        self.player.on_ground = False
-        reward = 0.01  # small positive reward for being alive
-    
-        # Reward for horizontal progress (moving right from start)
-        progress = max(0, self.player.x - self.platforms[0].x)
-        reward += progress * 0.001  # scale it down
-    
-        landed_this_step = False
-    
+
+        reward = 0.0
+
+        # Forward movement reward: only if moved right since last step
+        delta_x = self.player.x - prev_x
+        if delta_x > 0:
+            reward += delta_x * 0.05  # scale this as needed
+        else:
+            reward -= 0.02  # small penalty for no forward movement or back
+
+        # Jump initiation reward
+        if self.jumping and self.player.on_ground is False:
+            reward += 0.1  # reward for starting a jump
+
+        # Jump length reward (once landed)
+        if self.jumping and self.player.on_ground:
+            jump_length = self.player.x - self.jump_start_x
+            reward += jump_length * 0.1  # reward longer jumps more
+            self.jumping = False
+
+        # Collision checks with pads (existing code)
         for plat in self.platforms:
             result = self.player.check_collision(plat)
             if result == "land":
                 self.player.land_on(plat)
-                landed_this_step = True
-    
-                # If just landed, give jump height/distance rewards
-                if getattr(self.player, 'jumping', False):
-                    jump_height = self.player.max_jump_y - self.player.jump_start_y
-                    jump_distance = abs(self.player.x - self.player.jump_start_x)
-    
-                    # Scale and add jump rewards (tweak these)
-                    reward += jump_height * 0.05  
-                    reward += jump_distance * 0.02
-    
-                    self.player.jumping = False  # reset jump flag
-    
                 if plat.type == "end":
-                    reward = 100.0  # ultimate reward for goal
+                    reward += 100.0  # ultimate goal reward
                     self.done = True
                 elif plat.type == "pad" and id(plat) not in self.landed_pads:
-                    reward += 5.0  # big reward for new pad
+                    reward += 10.0  # bigger reward for new pad
                     self.landed_pads.add(id(plat))
                 break
-            elif result == "slide":
-                self.player.slide()
-    
-        # Out-of-bounds = fail with big penalty
-        if (self.player.y < -20 or self.player.y > HEIGHT + 50 or
-            self.player.x < -50 or self.player.x > WIDTH + 50):
-            reward = -10.0
+            
+        # Death penalty
+        if self.player.y < -20 or self.player.y > HEIGHT + 50 or \
+           self.player.x < -50 or self.player.x > WIDTH + 50:
+            reward -= 50.0  # heavy penalty
             self.done = True
-    
+
+        # Return obs etc as usual
         return self._get_obs(), reward, self.done, False, {}
 
 
 
+
     def _get_obs(self):
-        return np.array([
-            self.player.x, self.player.y,
-            self.player.vel_x, self.player.vel_y
-        ], dtype=np.float32)
+        px, py = self.player.x, self.player.y
+
+        next_pad = None
+        for plat in self.platforms:
+            if plat.type == "pad" and plat.x > px:
+                next_pad = plat
+                break
+
+        if next_pad is not None:
+            pad_cx = next_pad.x + next_pad.width / 2
+            pad_cy = next_pad.y + next_pad.height / 2
+        else:
+            pad_cx, pad_cy = self.platforms[-1].x, self.platforms[-1].y
+
+        # Return observation without velocity (just positions)
+        return (px, py, pad_cx, pad_cy)
+
+
 
     def render(self):
         if self.render_mode != "human":
