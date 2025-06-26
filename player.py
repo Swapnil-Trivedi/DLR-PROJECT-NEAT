@@ -53,7 +53,7 @@ class Player:
     def get_aim_direction(self):
         range_x = 200
         range_y = 150
-        t = self.aim_timer / self.aim_max_time * 2 * math.pi
+        t = -1 * self.aim_timer / self.aim_max_time * 0.5 * math.pi
         dx = math.cos(t) * (range_x // 2)
         dy = math.sin(t) * (range_y // 2)
         return dx, dy
