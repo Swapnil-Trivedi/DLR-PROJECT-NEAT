@@ -139,11 +139,16 @@ def eval_genomes(genomes, config):
                 if result == "land":
                     player.land_on(plat)
 
-                    if plat.type == "pad" and plat not in landed_platforms[i]:
-                        genome.fitness += 25
-                        score += 1
-                        landed_platforms[i].add(plat)
-
+                    # Reward only if this is a new platform and it's farther right
+                    if plat.type == "pad":
+                        if plat not in landed_platforms[i]:
+                            genome.fitness += 25  # One-time reward for landing here
+                            landed_platforms[i].add(plat)
+                            player.last_pad_x = plat.x  # track position
+                        else:
+                            # Small penalty for re-landing the same pad
+                            genome.fitness -= 1
+                    
                     elif plat.type == "end":
                         genome.fitness += 30
                         score += 10
