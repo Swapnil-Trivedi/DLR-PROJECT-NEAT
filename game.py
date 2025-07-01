@@ -148,7 +148,7 @@ def eval_genomes(genomes, config):
                         else:
                             # Small penalty for re-landing the same pad
                             genome.fitness -= 1
-                    
+
                     elif plat.type == "end":
                         genome.fitness += 30
                         score += 10
@@ -169,6 +169,18 @@ def eval_genomes(genomes, config):
             if not landed and player.on_ground:
                 genome.fitness -= 5  # Idling penalty
 
+            if not hasattr(player, "last_pad_x"):
+                player.last_pad_x = 0  # Start from beginning
+
+            forward_progress = player.x - player.last_pad_x
+            if forward_progress > 50:  # Has moved forward 50+ pixels
+                genome.fitness += 5
+                player.last_pad_x = player.x  # Update checkpoint
+          
+            # Penalize bouncing on the same platform
+            if player.on_ground and plat in landed_platforms[i]:
+                genome.fitness -= 0.2  # Discourage bouncing on same platform
+          
             # Penalize falling or leaving bounds
             if player.y > HEIGHT + 50 or player.x < -50 or player.x > WIDTH + 50:
                 genome.fitness -= 20
