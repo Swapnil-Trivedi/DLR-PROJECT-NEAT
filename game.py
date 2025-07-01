@@ -142,12 +142,12 @@ def eval_genomes(genomes, config):
                     # Reward only if this is a new platform and it's farther right
                     if plat.type == "pad":
                         if plat not in landed_platforms[i]:
-                            genome.fitness += 25  # One-time reward for landing here
+                            genome.fitness += 50  # One-time reward for landing here
                             landed_platforms[i].add(plat)
                             player.last_pad_x = plat.x  # track position
                         else:
                             # Small penalty for re-landing the same pad
-                            genome.fitness -= 1
+                            genome.fitness -= 10
 
                     elif plat.type == "end":
                         genome.fitness += 300  # Big reward for reaching the end
@@ -167,7 +167,7 @@ def eval_genomes(genomes, config):
 
             # Idle on platform
             if not landed and player.on_ground:
-                genome.fitness -= 5  # Idling penalty
+                genome.fitness -= 50  # Idling penalty
 
             if not hasattr(player, "last_pad_x"):
                 player.last_pad_x = 0  # Start from beginning
