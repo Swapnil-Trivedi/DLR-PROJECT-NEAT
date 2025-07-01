@@ -14,7 +14,7 @@ FPS = 60
 GRAVITY = 0.4
 GENERATION = 0
 BEST_SCORE = 0
-GENERATION_TO_RUN = 100
+GENERATION_TO_RUN = 50
 
 win = pygame.display.set_mode((WIDTH, HEIGHT))
 pygame.display.set_caption("Jump King AI")
@@ -150,8 +150,8 @@ def eval_genomes(genomes, config):
                             genome.fitness -= 1
 
                     elif plat.type == "end":
-                        genome.fitness += 30
-                        score += 10
+                        genome.fitness += 300  # Big reward for reaching the end
+                        score += 100
                         BEST_SCORE = max(BEST_SCORE, score)
                         with open("best_genome.pkl", "wb") as f:
                             pickle.dump(genome, f)
