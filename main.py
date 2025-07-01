@@ -1,16 +1,19 @@
 import pygame
+import neat
 from player import Player
 from platform_model import Platform
 
+# Initialize pygame
 pygame.init()
+
 WIDTH, HEIGHT = 1400, 600  # Wider window for spacious level
 FPS = 90
 GRAVITY = 0.4
-
 win = pygame.display.set_mode((WIDTH, HEIGHT))
 pygame.display.set_caption("Jump King")
 clock = pygame.time.Clock()
 
+# Define the platform level (same as before)
 def get_fixed_level():
     platforms = []
     ground_y = HEIGHT - 40
@@ -35,60 +38,107 @@ def get_fixed_level():
 
     return platforms
 
-def main():
-    run = True
+# Function to evaluate the genomes in the population
+def eval_genomes(genomes, config):
+    """
+    Evaluates each genome (neural network) in the current population.
+    """
+    global WIN
+    win = WIN
     score = 0
-    landed_pads = set()
-    platforms = get_fixed_level()
-    player = Player(platforms[0].x + 20, platforms[0].y - 40)
+    nets = []
+    players = []
+    ge = []
 
-    while run:
+    # Create the neural networks and player objects
+    for genome_id, genome in genomes:
+        genome.fitness = 0  # Start with zero fitness
+        net = neat.nn.FeedForwardNetwork.create(genome, config)
+        nets.append(net)
+        players.append(Player(220, HEIGHT - 60))  # Starting position of player
+        ge.append(genome)
+
+    platforms = get_fixed_level()
+    run = True
+
+    while run and len(players) > 0:
         clock.tick(FPS)
-        win.fill((255, 255, 255))
+        win.fill((255, 255, 255))  # Clear the screen
 
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 run = False
-            player.handle_input(event)
+                pygame.quit()
+                quit()
 
-        player.apply_gravity(GRAVITY)
-        player.update()
+        for i, player in enumerate(players):
+            player.apply_gravity(GRAVITY)
+            player.update()
 
-        # Bounds check
-        if player.y < -20 or player.y > HEIGHT + 50 or player.x < -50 or player.x > WIDTH + 50:
-            print("Fell out of bounds. Restarting.")
-            pygame.time.delay(1000)
-            return main()
+            # Feed the neural network with current inputs (player state)
+            output = nets[players.index(player)].activate((player.x, player.y, player.vel_x, player.vel_y))
 
-        player.on_ground = False
+            # Decide whether to jump based on the neural network output
+            if output[0] > 0.5:
+                # Jump if the network says so
+                dx, dy = player.get_aim_direction()
+                player.jump(dx, dy)
 
-        for plat in platforms:
-            result = player.check_collision(plat)
-            if result == "land":
-                player.land_on(plat)
-                if plat.type == "end":
-                    print("Reached the goal!")
-                    pygame.time.delay(1500)
-                    return main()
-                elif plat.type == "pad" and id(plat) not in landed_pads:
-                    score += 1
-                    landed_pads.add(id(plat))
-                break
-            elif result == "slide":
-                player.slide()
+            player.on_ground = False
+            for plat in platforms:
+                result = player.check_collision(plat)
+                if result == "land":
+                    player.land_on(plat)
+                    genome.fitness += 1  # Increase fitness when landing on a pad
+                    if plat.type == "end":
+                        print("Goal reached!")
+                        genome.fitness += 10  # Reward for reaching the goal
+                        run = False
+                        break
+                    break
+                elif result == "slide":
+                    player.slide()
 
+            # Remove players that fall out of bounds
+            if player.y > HEIGHT + 50 or player.x < -50 or player.x > WIDTH + 50:
+                nets.pop(players.index(player))
+                ge.pop(players.index(player))
+                players.pop(players.index(player))
+
+            player.draw(win)
+            player.draw_trajectory(win)
+
+        # Draw platforms and update display
         for plat in platforms:
             plat.draw(win)
 
-        player.draw(win)
-        player.draw_trajectory(win)
-
-
-        font = pygame.font.SysFont(None, 24)
-        win.blit(font.render(f"Score: {score}", True, (0, 0, 0)), (10, 10))
+        # Update the display
         pygame.display.update()
 
-    pygame.quit()
+# NEAT configuration and training setup
+def run(config_file):
+    """
+    Runs the NEAT algorithm to train a neural network to play the game.
+    """
+    config = neat.config.Config(neat.DefaultGenome, neat.DefaultReproduction,
+                                neat.DefaultSpeciesSet, neat.DefaultStagnation,
+                                config_file)
+
+    # Create the population for the NEAT algorithm
+    p = neat.Population(config)
+
+    # Add a reporter to show progress
+    p.add_reporter(neat.StdOutReporter(True))
+    stats = neat.StatisticsReporter()
+    p.add_reporter(stats)
+    # p.add_reporter(neat.Checkpointer(5))
+
+    # Run for a given number of generations
+    winner = p.run(eval_genomes, 50)
+
+    # Print the winner genome
+    print('\nBest genome:\n{!s}'.format(winner))
 
 if __name__ == "__main__":
-    main()
+    # Run the NEAT algorithm with the configuration file
+    run("config-feedforward.ini")
