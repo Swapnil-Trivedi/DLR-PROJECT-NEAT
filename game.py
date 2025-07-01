@@ -1,20 +1,22 @@
 import pygame
 import neat
+import os
+import time
 from player import Player
 from platform_model import Platform
 import math
 
-# Initialize pygame
 pygame.init()
-
 WIDTH, HEIGHT = 1400, 600
-FPS = 90
+FPS = 60
 GRAVITY = 0.4
-MAX_FRAMES = 1000
+GENERATION = 0
+BEST_SCORE = 0
 
-WIN = pygame.display.set_mode((WIDTH, HEIGHT))
-pygame.display.set_caption("Jump NEAT")
-clock = pygame.time.Clock()
+win = pygame.display.set_mode((WIDTH, HEIGHT))
+pygame.display.set_caption("Jump King AI")
+
+font = pygame.font.SysFont("comicsans", 28)
 
 def get_fixed_level():
     platforms = []
@@ -37,194 +39,119 @@ def get_fixed_level():
 
     return platforms
 
-# def eval_genomes(genomes, config):
-#     global WIN
-#     win = WIN
-#     nets = []
-#     players = []
-#     ge = []
+def draw_window(win, players, platforms, gen, best_score, score):
+    win.fill((255, 255, 255))
+    for plat in platforms:
+        plat.draw(win)
 
-#     for genome_id, genome in genomes:
-#         genome.fitness = 0
-#         net = neat.nn.FeedForwardNetwork.create(genome, config)
-#         nets.append(net)
-#         players.append(Player(20, HEIGHT - 70))  # Just above start platform
-#         ge.append(genome)
+    for p in players:
+        p.draw(win)
 
-#     platforms = get_fixed_level()
-#     run = True
-#     frame_count = 0
+    gen_text = font.render(f"Generation: {gen}", 1, (0, 0, 0))
+    alive_text = font.render(f"Alive: {len(players)}", 1, (0, 0, 0))
+    best_text = font.render(f"Best Score: {best_score}", 1, (0, 0, 0))
+    score_text = font.render(f"Score: {score}", 1, (0, 0, 0))
 
-#     while run and len(players) > 0 and frame_count < MAX_FRAMES:
-#         clock.tick(FPS)
-#         win.fill((255, 255, 255))
-#         frame_count += 1
+    win.blit(gen_text, (10, 10))
+    win.blit(alive_text, (10, 40))
+    win.blit(best_text, (WIDTH - best_text.get_width() - 10, 10))
+    win.blit(score_text, (WIDTH - score_text.get_width() - 10, 40))
 
-#         for event in pygame.event.get():
-#             if event.type == pygame.QUIT:
-#                 run = False
-#                 pygame.quit()
-#                 quit()
-
-#         for i, player in enumerate(players):
-#             player.apply_gravity(GRAVITY)
-#             player.update()
-
-#             # Find next platform to aim for (right of player)
-#             try:
-#                 next_plat = min(
-#                     [p for p in platforms if p.x > player.x],
-#                     key=lambda p: p.x
-#                 )
-#             except ValueError:
-#                 next_plat = platforms[-1]  # fallback to end
-
-#             # Input to NEAT: normalized
-#             input_vector = [
-#                 player.x / WIDTH,
-#                 player.y / HEIGHT,
-#                 player.vel_x / 10.0,
-#                 player.vel_y / 10.0,
-#                 (next_plat.x - player.x) / WIDTH,
-#                 (next_plat.y - player.y) / HEIGHT
-#             ]
-#             output = nets[i].activate(input_vector)
-
-#             if player.on_ground and output[0] > 0.5:
-#                 dx, dy = player.get_aim_direction()
-#                 player.jump(dx, dy)
-
-#             # Collision check
-#             player.on_ground = False
-#             for plat in platforms:
-#                 result = player.check_collision(plat)
-#                 if result == "land":
-#                     player.land_on(plat)
-#                     ge[i].fitness += 5  # reward for landing
-#                     if plat.type == "end":
-#                         print("Goal reached!")
-#                         ge[i].fitness += 20
-#                         run = False
-#                     break
-#                 elif result == "slide":
-#                     player.slide()
-
-#             # Distance-based shaping reward
-#             dx = abs(next_plat.x - player.x)
-#             dy = abs(next_plat.y - player.y)
-#             ge[i].fitness += 1.0 / (dx + dy + 5)
-
-#             # Out of bounds removal
-#             if player.y > HEIGHT + 100 or player.x < -100 or player.x > WIDTH + 100:
-#                 nets.pop(i)
-#                 ge.pop(i)
-#                 players.pop(i)
-#                 continue
-
-#             # Draw agent
-#             player.draw(win)
-#             player.draw_trajectory(win)
-
-#         for plat in platforms:
-#             plat.draw(win)
-
-#         pygame.display.update()
+    pygame.display.update()
 
 def eval_genomes(genomes, config):
-    global WIN
-    win = WIN
-    nets, players, ge = [], [], []
-    stay_timer, last_platform = [], []
-    platforms = get_fixed_level()
-    start_plat = platforms[0]
+    global GENERATION, BEST_SCORE
+    GENERATION += 1
+
+    nets = []
+    players = []
+    ge = []
 
     for genome_id, genome in genomes:
         genome.fitness = 0
         net = neat.nn.FeedForwardNetwork.create(genome, config)
-        player = Player(start_plat.x + 10, start_plat.y - 30)
         nets.append(net)
-        players.append(player)
+        players.append(Player(10, HEIGHT - 70))  # Start at first platform
         ge.append(genome)
-        stay_timer.append(0)
-        last_platform.append(None)
 
-    while len(players) > 0:
+    platforms = get_fixed_level()
+    score = 0
+    start_time = time.time()
+
+    run = True
+    clock = pygame.time.Clock()
+
+    while run and len(players) > 0:
         clock.tick(FPS)
-        win.fill((255, 255, 255))
+        current_time = time.time()
+        elapsed = current_time - start_time
 
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
+                run = False
                 pygame.quit()
                 quit()
-
-        to_remove = []
 
         for i, player in enumerate(players):
             player.apply_gravity(GRAVITY)
             player.update()
 
-            next_plat = None
-            min_dx = float('inf')
-            for plat in platforms:
-                if plat.x + plat.width >= player.x + player.width:
-                    dx = plat.x - player.x
-                    if dx < min_dx:
-                        min_dx = dx
-                        next_plat = plat
-
-            dx_to_plat = next_plat.x - player.x if next_plat else 0
-            dy_to_plat = next_plat.y - player.y if next_plat else 0
-
-            inputs = (player.x, player.y, player.vel_x, player.vel_y, dx_to_plat, dy_to_plat)
+            inputs = (
+                player.x,
+                player.y,
+                player.vel_x,
+                player.vel_y,
+                player.get_nearest_platform_x(platforms),
+                player.get_nearest_platform_y(platforms)
+            )
             output = nets[i].activate(inputs)
+            angle = output[0] * 180 - 90  # [-90, 90] degrees
 
+            # Jump if on ground
             if player.on_ground:
-                angle = output[0] * (math.pi / 2) - math.pi / 2
-                dx = math.cos(angle) * player.fixed_power
-                dy = math.sin(angle) * player.fixed_power
+                dx = player.fixed_power * math.cos(math.radians(angle))
+                dy = player.fixed_power * math.sin(math.radians(angle))
+                if dx > 0 and dy < 0:
+                    ge[i].fitness += 5  # incentive for upward-forward jump
                 player.jump(dx, dy)
 
+            # Collision checks
             player.on_ground = False
             landed = False
-
             for plat in platforms:
                 result = player.check_collision(plat)
                 if result == "land":
                     player.land_on(plat)
-                    if plat != last_platform[i]:
+                    if plat.type == "pad":
                         ge[i].fitness += 15
-                        last_platform[i] = plat
-                        stay_timer[i] = 0
-                    else:
-                        stay_timer[i] += 1
-                        if stay_timer[i] > 2 * FPS:
-                            ge[i].fitness -= 5
-                    if plat.type == "end":
+                        score += 1
+                    elif plat.type == "end":
                         ge[i].fitness += 20
+                        score += 10
+                        run = False
                     landed = True
                     break
                 elif result == "slide":
-                    ge[i].fitness += 5
+                    player.slide()
+                    ge[i].fitness += 5  # reward for hitting edge
 
+            if not landed and player.on_ground:
+                ge[i].fitness -= 5  # idling penalty
+
+            # Remove dead agents
             if player.y > HEIGHT + 50 or player.x < -50 or player.x > WIDTH + 50:
                 ge[i].fitness -= 20
-                to_remove.append(i)
+                nets.pop(i)
+                ge.pop(i)
+                players.pop(i)
+                continue
 
-            player.draw(win)
+        if elapsed > 60:
+            break
 
-        for i in sorted(to_remove, reverse=True):
-            nets.pop(i)
-            ge.pop(i)
-            players.pop(i)
-            stay_timer.pop(i)
-            last_platform.pop(i)
+        draw_window(win, players, platforms, GENERATION, BEST_SCORE, score)
 
-        for plat in platforms:
-            plat.draw(win)
-
-        pygame.display.update()
-
-
+    BEST_SCORE = max(BEST_SCORE, score)
 
 def run(config_file):
     config = neat.config.Config(
@@ -232,15 +159,18 @@ def run(config_file):
         neat.DefaultReproduction,
         neat.DefaultSpeciesSet,
         neat.DefaultStagnation,
-        config_file
+        config_file,
     )
 
     p = neat.Population(config)
     p.add_reporter(neat.StdOutReporter(True))
-    p.add_reporter(neat.StatisticsReporter())
-    winner = p.run(eval_genomes, 500)
+    stats = neat.StatisticsReporter()
+    p.add_reporter(stats)
 
+    winner = p.run(eval_genomes, 50)
     print('\nBest genome:\n{!s}'.format(winner))
 
 if __name__ == "__main__":
-    run("config-feedforward.ini")
+    local_dir = os.path.dirname(__file__)
+    config_path = os.path.join(local_dir, "config-feedforward.ini")
+    run(config_path)

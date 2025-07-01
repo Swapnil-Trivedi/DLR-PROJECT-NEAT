@@ -43,3 +43,20 @@ class Player:
         self.vel_y = 0
         self.vel_x = 0
         self.on_ground = True
+
+    def get_nearest_platform_x(self, platforms):
+        visible = [p for p in platforms if p.y >= self.y]
+        if not visible:
+            return self.x
+        nearest = min(visible, key=lambda p: abs(self.x - p.x))
+        return nearest.x
+
+    def get_nearest_platform_y(self, platforms):
+        visible = [p for p in platforms if p.y >= self.y]
+        if not visible:
+            return self.y
+        nearest = min(visible, key=lambda p: abs(self.y - p.y))
+        return nearest.y
+    def slide(self):
+         # Simple slide behavior, e.g., reduce horizontal speed slightly
+         self.vel_x *= 0.9  # friction-like effect
