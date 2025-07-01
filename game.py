@@ -1,5 +1,6 @@
 import pygame
 import neat
+from neat.checkpoint import Checkpointer
 import os
 import time
 from player import Player
@@ -10,6 +11,7 @@ pygame.init()
 WIDTH, HEIGHT = 1400, 600
 FPS = 60
 GRAVITY = 0.4
+GENERATION_TO_RUN = 100
 GENERATION = 0
 BEST_SCORE = 0
 
@@ -167,8 +169,20 @@ def run(config_file):
     stats = neat.StatisticsReporter()
     p.add_reporter(stats)
 
-    winner = p.run(eval_genomes, 50)
+
+      # Save a checkpoint every 20 generations
+    p.add_reporter(Checkpointer(generation_interval=20, time_interval_seconds=None, filename_prefix="neat-checkpoint-"))
+
+    winner = p.run(eval_genomes, GENERATION_TO_RUN)
     print('\nBest genome:\n{!s}'.format(winner))
+    
+    # Save the winning genome for future use
+    with open("best_genome.pkl", "wb") as f:
+        import pickle
+        pickle.dump(winner, f)
+
+   
+    print('\nBest genome saved as "best_genome.pkl":\n{!s}'.format(winner))
 
 if __name__ == "__main__":
     local_dir = os.path.dirname(__file__)
