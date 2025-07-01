@@ -197,10 +197,10 @@ def eval_genomes(genomes, config):
         if time.time() - last_genocide > 20 and len(players) > 4:
             fitnesses = [(idx, ge[idx].fitness) for idx in range(len(players))]
             fitnesses.sort(key=lambda x: x[1], reverse=True)
-            top_50 = int(len(players) * 0.5)
-            bottom_50 = int(len(players) * 0.5)
+            top_35 = int(len(players) * 0.35)
+            bottom_65 = int(len(players) * 0.65)
 
-            kill_indices = [idx for idx, _ in fitnesses[top_50:top_50 + bottom_50]]
+            kill_indices = [idx for idx, _ in fitnesses[top_35:top_35 + bottom_65]]
             for idx in sorted(kill_indices, reverse=True):
                 nets.pop(idx)
                 ge.pop(idx)
