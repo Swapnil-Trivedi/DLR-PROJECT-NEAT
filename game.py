@@ -78,7 +78,7 @@ def eval_genomes(genomes, config):
         genome.fitness = 0
         net = neat.nn.FeedForwardNetwork.create(genome, config)
         nets.append(net)
-        players.append(Player(10, HEIGHT - 70))  # Start from first platform
+        players.append(Player(10, HEIGHT - 70))
         ge.append(genome)
 
     clock = pygame.time.Clock()
@@ -95,9 +95,19 @@ def eval_genomes(genomes, config):
 
         for i in range(len(players) - 1, -1, -1):
             player = players[i]
+            genome = ge[i]
+
             player.apply_gravity(GRAVITY)
             player.update()
 
+            # Init height tracking
+            if not hasattr(player, "highest_y"):
+                player.highest_y = player.y
+            elif player.y < player.highest_y:
+                player.highest_y = player.y
+                genome.fitness += 1  # Reward upward progress
+
+            # Inputs for neural net
             inputs = (
                 player.x,
                 player.y,
@@ -108,13 +118,16 @@ def eval_genomes(genomes, config):
             )
 
             output = nets[i].activate(inputs)
-            angle = output[0] * 180 - 90  # Map output to [-90, 90] degrees
+            angle = output[0] * 180 - 90
 
             if player.on_ground:
                 dx = player.fixed_power * math.cos(math.radians(angle))
                 dy = player.fixed_power * math.sin(math.radians(angle))
+
+                # Slight reward for initiating upward-forward jump
                 if dx > 0 and dy < 0:
-                    ge[i].fitness += 5  # Forward-upward jump bonus
+                    genome.fitness += 0.5
+
                 player.jump(dx, dy)
 
             player.on_ground = False
@@ -122,20 +135,21 @@ def eval_genomes(genomes, config):
 
             for plat in platforms:
                 result = player.check_collision(plat)
+
                 if result == "land":
                     player.land_on(plat)
 
                     if plat.type == "pad" and plat not in landed_platforms[i]:
-                        ge[i].fitness += 25
+                        genome.fitness += 25
                         score += 1
                         landed_platforms[i].add(plat)
 
                     elif plat.type == "end":
-                        ge[i].fitness += 30
+                        genome.fitness += 30
                         score += 10
                         BEST_SCORE = max(BEST_SCORE, score)
                         with open("best_genome.pkl", "wb") as f:
-                            pickle.dump(ge[i], f)
+                            pickle.dump(genome, f)
                         run = False
                         break
 
@@ -143,26 +157,31 @@ def eval_genomes(genomes, config):
                     break
 
                 elif result == "slide":
-                    player.slide()
-                    ge[i].fitness += 5  # reward for hitting edge
+                    # Optional: very small edge-hit reward
+                    genome.fitness += 0.2
 
+            # Idle on platform
             if not landed and player.on_ground:
-                ge[i].fitness -= 5  # idle penalty
+                genome.fitness -= 5  # Idling penalty
 
+            # Penalize falling or leaving bounds
             if player.y > HEIGHT + 50 or player.x < -50 or player.x > WIDTH + 50:
-                ge[i].fitness -= 20
+                genome.fitness -= 20
                 nets.pop(i)
                 ge.pop(i)
                 players.pop(i)
                 landed_platforms.pop(i)
                 continue
 
-        # Genocide logic every 20 seconds
+            # Time penalty (encourage faster solutions)
+            genome.fitness -= 0.01
+
+        # Genocide (kill lowest 50% every 20 sec if too many)
         if time.time() - last_genocide > 20 and len(players) > 4:
             fitnesses = [(idx, ge[idx].fitness) for idx in range(len(players))]
             fitnesses.sort(key=lambda x: x[1], reverse=True)
             top_50 = int(len(players) * 0.5)
-            bottom_50 = int(len(players) * 0.50)
+            bottom_50 = int(len(players) * 0.5)
 
             kill_indices = [idx for idx, _ in fitnesses[top_50:top_50 + bottom_50]]
             for idx in sorted(kill_indices, reverse=True):
@@ -177,6 +196,7 @@ def eval_genomes(genomes, config):
 
         if elapsed > 60:
             break
+
 
 def run(config_file):
     config = neat.Config(
