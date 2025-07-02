@@ -1,4 +1,3 @@
-# === platform_model.py ===
 import pygame
 
 class Platform:
