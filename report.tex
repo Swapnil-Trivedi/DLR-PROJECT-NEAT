@@ -1,0 +1,86 @@
+\documentclass[10pt,conference]{IEEEtran}
+\usepackage{times}
+\usepackage{amsmath}
+\usepackage{graphicx}
+
+\title{Evolving Jump Strategies in a Platformer using NEAT}
+
+\author{\IEEEauthorblockN{Swapnil}
+\IEEEauthorblockA{AI \& Game Intelligence Lab, 2025\\
+Email: swapnil@example.com}}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+This paper explores the application of NeuroEvolution of Augmenting Topologies (NEAT) to train an agent in a 2D physics-based platformer environment modeled after \textit{Jump King}. Through structured reward shaping, extinction strategies, and adaptive mutation, the agent evolves strategic jumping behavior to reach a final goal platform.
+\end{abstract}
+
+\section{Introduction}
+We aim to create a Jump King-inspired AI agent that learns to navigate a platformer level using NEAT. Unlike traditional reinforcement learning, NEAT evolves neural networks via genetic algorithms, requiring no gradient-based optimization. The agent's only decision is the angle of jump, based on its current physical state and platform locations.
+
+\section{Game Environment and Agent Design}
+\textbf{Objective:} Start on a platform, jump across intermediate pads, and reach the goal platform. The agent is rewarded for strategic landings and penalized for falling or stalling.
+
+\textbf{Mechanics:} A fixed gravitational force acts every frame. Jump angles determine direction and are computed from the output of a neural network.
+
+\section{Neural Network Design}
+\textbf{Inputs (6):}
+\begin{itemize}
+    \item Agent position $(x, y)$
+    \item Agent velocity $(v_x, v_y)$
+    \item Nearest platform offset $(\Delta x, \Delta y)$
+\end{itemize}
+
+\textbf{Output (1):}
+\begin{itemize}
+    \item A jump angle $[-90^\circ, +90^\circ]$ mapped from output $\in [0,1]$
+\end{itemize}
+
+\textbf{Architecture:} Feedforward NEAT network, 6 inputs, 1 output, with topology evolved over generations.
+
+\section{NEAT Configuration}
+Population: 150 agents.  
+Speciation: Enabled.  
+Activation: Tanh.  
+Selection: Fitness-proportionate with elitism.  
+Mutation: Adaptive rate.
+
+\section{Fitness Function Design}
+Rewards and penalties guide learning:
+\begin{itemize}
+    \item $+50$ for landing on a new pad
+    \item $+300$ for reaching goal platform
+    \item $+5$ for forward progress $>50px$
+    \item $+0.5$ for upward-forward jumps
+    \item $-10$ for re-landing same pad
+    \item $-20$ for dying
+    \item $-50$ for idling
+    \item $-0.01$ per frame
+\end{itemize}
+
+\section{Extinction Strategy}
+Every 20 seconds:
+\begin{itemize}
+    \item Kill bottom 65\% of agents if not in top 35\%
+\end{itemize}
+This encourages exploration and prevents convergence to lazy behaviors.
+
+\section{Results and Analysis}
+After $\sim$12 generations:
+\begin{itemize}
+    \item Agents landed successfully on pads and reached goal
+    \item Fitness improved rapidly with extinction
+    \item Best genome achieved fitness $> 300$
+\end{itemize}
+
+\textbf{Behavior Observed:}
+\begin{itemize}
+    \item Strategic jumps toward next pads
+    \item Avoidance of idle loops or repetitive paths
+\end{itemize}
+
+\section{Conclusion}
+The project successfully demonstrates how NEAT can evolve agents capable of solving a complex platforming task using a single-output decision model. Fitness shaping, strategic extinction, and architectural simplicity resulted in emergent intelligent behavior.
+
+\end{document}
