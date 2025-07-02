@@ -7,12 +7,11 @@ class Player:
         self.width, self.height = 20, 30
         self.vel_x, self.vel_y = 0, 0
         self.on_ground = False
-
         # Aiming system
         self.aiming = False
         self.aim_timer = 0
         self.aim_max_time = 120
-        self.fixed_power = 15  # fixed jump strength
+        self.fixed_power = 15
 
     def draw(self, win):
         pygame.draw.rect(win, (0, 0, 255), (self.x, self.y, self.width, self.height))
@@ -94,6 +93,19 @@ class Player:
         self.vel_x = 0
         self.on_ground = True
 
+    def get_nearest_platform_x(self, platforms):
+        visible = [p for p in platforms if p.y >= self.y]
+        if not visible:
+            return self.x
+        nearest = min(visible, key=lambda p: abs(self.x - p.x))
+        return nearest.x
+
+    def get_nearest_platform_y(self, platforms):
+        visible = [p for p in platforms if p.y >= self.y]
+        if not visible:
+            return self.y
+        nearest = min(visible, key=lambda p: abs(self.y - p.y))
+        return nearest.y
     def slide(self):
-        # No forward movement, fall down
-        self.vel_x = 0
+         # Simple slide behavior, e.g., reduce horizontal speed slightly
+         self.vel_x *= 0.9  # friction-like effect

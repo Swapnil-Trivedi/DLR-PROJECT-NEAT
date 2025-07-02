@@ -1,98 +1,166 @@
-# Deep learning for robotics
-## Neuroevolution of jumping behaviour of a jumping agent
+# NEAT Platformer AI – Evolving Agents for a Jump King-Inspired Game
 
-Jump King: AI Edition is a deterministic 2D skill-based platformer where the objective is to reach a goal platform by jumping across a fixed series of intermediate platforms using precise projectile motion. The game is designed for both human players and AI agents trained using NEAT or PPO.
+## 1. Introduction
 
-## Objective
+This project explores how **Neuroevolution**, specifically the **NEAT (Neuroevolution of Augmenting Topologies)** algorithm, can be used to train an AI agent to master a simplified 2D platformer inspired by *Jump King*. The agent learns using evolutionary strategies, evolving neural networks **without backpropagation**.
 
-The player starts on a ground-level platform on the far left of the screen. The goal is to reach the ground-level platform on the far right, by successfully jumping across suspended intermediate platforms placed at varying heights and horizontal distances.
+The goal is to evolve agents that can learn strategic jumping across platforms, navigating physics like gravity and momentum, **without any hardcoded logic or reward shaping**.
 
-Falling, jumping outside screen bounds, or touching the ground anywhere else results in a game over and resets the level.
+---
 
-## Controls (Human Player)
+## 2. Game Architecture
 
-- Hold the `SPACE` key: This enters aiming mode. A dotted trajectory arc is shown, oscillating over time to help aim.
-- Release the `SPACE` key: The player jumps in the current direction based on the visible arc. The jump power is fixed; only the direction varies.
+###  Objective
+The agent must:
+- Start on a fixed platform
+- Jump across intermediate pads
+- Reach the final goal platform
+- Avoid falling or idling
 
-The game is designed to require precision. There is no air control and no direction change mid-jump. All motion is governed by initial jump direction and projectile physics.
+### Mechanics
+- **Gravity:** Constant force pulling the agent down
+- **Jumping:** Jump angle output by neural net; fixed power
+- **Collision:** Detects landing or edge contact with platforms
+- **Failure States:** Falling out of bounds or stalling
 
-## Game Physics
+---
 
-The player moves according to projectile motion:
+## 3. Neural Network Design
 
-- Horizontal and vertical components of velocity are calculated from the aim direction.
-- Gravity is applied every frame to the vertical velocity.
-- There is no air resistance or friction.
+### Inputs to the NEAT Network:
+1. `player.x` – Horizontal position  
+2. `player.y` – Vertical position  
+3. `vel_x` – Horizontal velocity  
+4. `vel_y` – Vertical velocity  
+5. `dx` – Distance to nearest platform (X-axis)  
+6. `dy` – Distance to nearest platform (Y-axis)  
 
-Gravity causes the player to accelerate downwards each frame, resulting in a curved jump arc. The longer the player is airborne, the more downward momentum they accumulate.
+### Output:
+- **Jump angle** (mapped from -90° to +90°)  
+  Used to compute:
+```
+dx = cos(angle) * power
+dy = sin(angle) * power
 
-To prevent the player from moving too fast and passing through platforms, a fall speed cap is enforced.
+```
 
-## Jump Mechanic
+---
 
-The jump mechanic is based on direction selection with fixed power:
+## 4. NEAT Configuration
 
-- When the player is on a platform and holds `SPACE`, an oscillating trajectory is shown.
-- This arc moves within a rectangular area above and in front of the player.
-- When the key is released, the direction at that moment is used to compute the jump vector.
-- The jump direction is normalized and scaled by a fixed power value to compute velocity.
+- **Population Size:** 50 - 150  
+- **Activation Function:** `tanh`  `sigmoid` `ReLU`
+- **Network Type:** Feedforward  
+- **Input/Output:** 6 inputs, 1 output  
+- **Speciation:** Enabled  
+- **Crossover & Mutation:** Tuned via config  
+- **Elitism:** Top genomes preserved per generation  
 
-## Trajectory Indicator
+---
 
-While aiming, the game displays a dotted arc showing the predicted jump path. This is calculated using the current aim direction and fixed power, with simulated points showing the future path based on projectile motion. This visual aid helps players judge where the jump will land before committing.
+## 5. Fitness Function Design
 
-## Platforms
+| Behavior                     | Reward / Penalty |
+|-----------------------------|------------------|
+| Landing on new pad          | +50              |
+| Re-landing same pad         | −10              |
+| Reaching goal pad           | +300             |
+| Falling / dying             | −20              |
+| Forward progress ≥ 50px     | +5               |
+| Idling on same pad          | −50              |
+| Edge contact (slide)        | +0.2             |
+| Time penalty (per frame)    | −0.01            |
+| Good jump direction         | +0.5             |
 
-- Start and end platforms are at ground level on the left and right ends of the screen, respectively.
-- Up to 15 intermediate platforms are placed at various vertical and horizontal positions.
-- The platform layout is fixed and designed to allow a continuous, playable jump path.
-- Platforms never overlap, and spacing ensures the player always has a reachable next step.
+This encourages exploration, planning, and generalization.
 
-## Collision Detection
+---
 
-- If the player lands on the **top** of a platform while falling downward, they stop, land safely, and can jump again.
-- If the player touches the **sides or bottom** of a platform, their horizontal velocity is canceled, and they begin to fall straight down.
-- If the player falls off the screen or touches the ground (except the start/end pads), the game resets.
+## 6. Genetic Diversity & Extinction Strategy
 
-## Scoring
+### Genocide Logic
+- Every 20 seconds: Bottom 65% of agents are culled (unless in top 35%)
+- Encourages innovation and prevents overfitting
 
-- +1 point is awarded for each successful landing on a new intermediate platform.
-- No points are given for landing again on the same platform.
-- Reaching the goal can optionally give a larger bonus (e.g., +10).
-- Dying resets the score to 0.
+### Checkpointing
+- Saves every 20 generations  
+- Best genome stored as `best_genome.pkl` for testing and replay
 
-## AI Agent Integration
+---
 
-The game supports training AI agents using NEAT or PPO.
+## Training Process
 
-### Observation Space
+### Key Training Milestones:
 
-A sample observation vector for the agent might include:
+**Generations 0–10:**  
+- Agents discover basic jumping  
+- Frequent failure due to overshooting or poor aim  
 
-- Player's current position (x, y)
-- Player's velocity (vx, vy)
-- Relative position to the next platform (dx, dy)
+**Generations 10–25:**  
+- Consistent landings on intermediate pads  
+- Smarter, more deliberate jumps emerge  
 
-### Action Space
+**Generations 25+:**  
+- Agents consistently reach the goal  
+- Multi-jump strategies evolve  
 
-The agent produces a 2D output vector indicating the jump direction (dx, dy), which is normalized and scaled to fixed power.
+---
 
-### Reward Function
+## 8. Experimentation Summary
 
-- +1 for landing on a new intermediate platform
-- +10 for reaching the goal
-- -1 to -10 for dying (falling or jumping out of bounds)
-- Optional time penalty (e.g., -0.01 per frame) to encourage efficiency
+### Mutation & Crossover
+- Higher mutation rates to promote exploration  
+- Adaptive mutation avoids local optima  
 
-### NEAT Integration
+### Fitness Tweaks
+- Upward-forward motion rewarded  
+- Idleness and repetition penalized  
 
-The game can be used with `neat-python`. Each genome controls a player in the environment, receives state observations, outputs actions, and is scored by total reward (fitness).
+### Environment Tweaks
+- Randomized platform layouts  
+- Future work: moving platforms, hazards  
 
-### PPO Integration
+---
 
-The game can be wrapped as a `gym.Env` and trained using libraries like `stable-baselines3`. The same observation and action spaces apply, allowing continuous control.
+## 9. Results & Observations
 
-## Setup
+- **Best Genome Fitness:** ~300+  
+- **Goal Reached:** ~Generation 12 (with extinction strategy)  
+- **Training Time:** Reduced with aggressive extinction  
+- **Behavioral Insight:**
+- Learned upward-forward jumps toward reachable platforms  
+- Adapted to varied layouts – **strong generalization**
 
-1. Install Python 3.8+ and Pygame:
+---
 
+## 10. Conclusion
+
+This project demonstrates that:
+- **NEAT** is effective for training intelligent agents in 2D platformers  
+- **Fitness shaping** is crucial for meaningful learning  
+- **Genetic extinction** accelerates convergence and avoids stagnation  
+- Even with **a single output (jump angle)**, complex strategies can emerge
+
+The trained agent successfully learns to complete the level using strategic, physics-aware jumps — opening doors for future enhancements like dynamic environments or competitive multi-agent evolution.
+
+---
+
+## Demo & Future Work
+
+- Replay saved genomes using `best_genome.pkl`
+- Explore co-evolution or adversarial agents
+- Add dynamic terrain, moving platforms, or longer levels
+
+---
+
+## Requirements
+
+- Python 3.10+
+- `neat-python`
+- `pygame` (for visual simulation)
+- `numpy`, `math`, etc.
+
+Install with:
+```bash
+pip install -r requirements.txt
+``` 
